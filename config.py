@@ -7,10 +7,10 @@ sample_submission = 'sample_submission.csv'
 n_classes = 3
 
 features = [
-    'mfcc',
+    'eleven_mfcc_stat',
     'brightness',
     'rolloff',
-    'stat'
+    'forty_mfcc_stat'
 ]
 
 sample_rate = 16000

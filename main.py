@@ -30,34 +30,27 @@ def load_data(dataset):
     return loaded
 
 
-def extract_mfcc(data):
+def extract_eleven_mfcc_stat(wav):
     window_width = 0.220
     window_stride = 0.050
     sr = config.sample_rate
 
-    mfccs = []
-    for n_mfcc in [11, 5, 2]:
-        mfccs.append(librosa.feature.mfcc(data,
-                                          sr=sr,
-                                          n_mfcc=n_mfcc,
-                                          dct_type=2,
-                                          hop_length=int(window_stride * sr),
-                                          n_fft=int(window_width * sr)))
+    mfcc = librosa.feature.mfcc(wav,
+                                sr=sr,
+                                n_mfcc=11,
+                                dct_type=2,
+                                hop_length=int(window_stride * sr),
+                                n_fft=int(window_width * sr))
 
-    mfcc_means = np.concatenate([np.mean(mfccs[i], axis=1) for i in range(3)])
-    mfcc_std = np.concatenate([np.std(mfccs[i], axis=1) for i in range(3)])
-
-    return np.concatenate((mfcc_means, mfcc_std)).flatten()
+    return np.concatenate((np.mean(mfcc, axis=1), np.std(mfcc, axis=1))).flatten()
 
 
-def extract_brightness(data):
+def extract_brightness(fft):
     frequency_threshold = 1800
-    fft = np.abs(np.fft.rfft(data))
     return [np.sum(fft[frequency_threshold:]) / np.sum(fft)]
 
 
-def extract_rolloff(data):
-    fft = np.abs(np.fft.rfft(data))
+def extract_rolloff(fft):
     threshold = np.sum(fft) * 0.85
     energy = 0.0
 
@@ -67,8 +60,8 @@ def extract_rolloff(data):
             return [i]
 
 
-def extract_stat(data):
-    return [np.percentile(row, per) for row in librosa.feature.mfcc(y=data, sr=config.sample_rate, n_mfcc=40)
+def extract_forty_mfcc_stat(wav):
+    return [np.percentile(row, per) for row in librosa.feature.mfcc(wav, sr=config.sample_rate, n_mfcc=40)
             for per in (1, 25, 50, 75, 99)]
 
 
@@ -77,14 +70,16 @@ def prepare_data(audiofiles, dataset):
 
     for file in audiofiles:
         wav, _ = sf.read(file)
+        fft = np.abs(np.fft.rfft(wav))
+        _input = {'eleven_mfcc_stat': wav, 'brightness': fft, 'rolloff': fft, 'forty_mfcc_stat': wav}
+
         row = []
         for feature in config.features:
-            row.extend(globals()[f'extract_{feature}'](wav))
-
+            row.extend(globals()[f'extract_{feature}'](_input[feature]))
         data.append(row)
 
     columns = [feature[0] + str(i) for feature in config.features
-               for i in range({'m': 36, 'b': 1, 'r': 1, 's': 200}[feature[0]])]
+               for i in range({'e': 22, 'b': 1, 'r': 1, 'f': 200}[feature[0]])]
     prepared = pd.DataFrame(data, columns=columns)
     prepared.to_csv(os.path.join(config.prepared_path, dataset) + '.csv', index=False)
 
