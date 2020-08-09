@@ -9,8 +9,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn import metrics
 from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.mixture import BayesianGaussianMixture
 
 
 def list_audiofiles(path):
@@ -161,9 +161,10 @@ if __name__ == '__main__':
     scaler = MinMaxScaler()
     prep_train = scaler.fit_transform(train)
 
-    km = KMeans(n_clusters=config.n_classes, n_init=200, max_iter=10000)
-    tr_predictions = km.fit_predict(prep_train)
-    te_predictions = km.predict(scaler.transform(test))
+    bgm = BayesianGaussianMixture(n_components=config.n_classes, tol=0.00001, covariance_type='tied', max_iter=10000)
+
+    tr_predictions = bgm.fit_predict(prep_train)
+    te_predictions = bgm.predict(scaler.transform(test))
 
     print(f"20 first predictions are\n {te_predictions[:20]}")
     print("Enter values for relabeling")
