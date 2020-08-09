@@ -5,6 +5,10 @@ import librosa
 import numpy as np
 import pandas as pd
 import soundfile as sf
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn import metrics
+from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler
 
@@ -121,6 +125,22 @@ def relabel(predictions, re_dict):
     return re_predictions
 
 
+def plot_clusters(train, predictions, targets):
+    features = np.array([train[:, i] for i in range(train.shape[-1])
+                         if abs(np.corrcoef(predictions, train[:, i])[0, 1]) > 0.5]).T
+    num = 10000
+    pca = PCA(n_components=2).fit(features[:1000])
+    points = pca.transform(features[:num])
+
+    labels = [{0: 'speech', 1: 'music', 2: 'noise'}[label] for label in targets[:num]]
+    palette = {'speech': 'm', 'music': 'b', 'noise': 'y'}
+
+    plt.figure(figsize=(6, 6))
+    plt.title("Clusters after dimensionality reduction")
+    sns.scatterplot(points[:, 0], points[:, 1], hue=labels, palette=palette, alpha=0.15)
+    plt.show()
+
+
 if __name__ == '__main__':
 
     try:
@@ -138,17 +158,26 @@ if __name__ == '__main__':
     train = np.array(handle_wrong_rows(train_df, 'train'))
     test = np.array(handle_wrong_rows(test_df, 'test'))
 
-    scaler = MinMaxScaler().fit(train)
-    km = KMeans(n_clusters=config.n_classes, n_init=200, max_iter=10000).fit(scaler.transform(train))
-    predictions = km.predict(scaler.transform(test))
+    scaler = MinMaxScaler()
+    prep_train = scaler.fit_transform(train)
 
-    print(f"20 first predictions are\n {predictions[:20]}")
+    km = KMeans(n_clusters=config.n_classes, n_init=200, max_iter=10000)
+    tr_predictions = km.fit_predict(prep_train)
+    te_predictions = km.predict(scaler.transform(test))
+
+    print(f"20 first predictions are\n {te_predictions[:20]}")
     print("Enter values for relabeling")
 
     re_dict = dict()
     for c in range(config.n_classes):
         re_dict[c] = int(input(f"{c}: "))
 
-    re_predictions = relabel(predictions, re_dict)
+    re_predictions = relabel(te_predictions, re_dict)
     submission['target'] = re_predictions
     submission.to_csv(config.submission, index=False)
+
+    re_predictions = relabel(tr_predictions, re_dict)
+    targets = pd.read_csv('targets.csv').target
+    print('\nModel accuracy: %.3f' % (metrics.accuracy_score(targets, re_predictions)))
+
+    plot_clusters(prep_train, re_predictions, targets)
