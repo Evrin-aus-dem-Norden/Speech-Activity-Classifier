@@ -14,6 +14,9 @@ from sklearn.mixture import BayesianGaussianMixture
 
 
 def list_audiofiles(path):
+    """
+    Compose list of paths to all the wav files in a directory tree.
+    """
     audiofiles = []
 
     for dirpath, _, files in os.walk(path):
@@ -27,6 +30,9 @@ def list_audiofiles(path):
 
 
 def load_data(dataset):
+    """
+    Load .csv file located in config.prepared_path directory with dataset name.
+    """
     loaded = pd.read_csv(os.path.join(config.prepared_path, dataset) + '.csv')
     if config.verbose:
         print(f"Loaded {dataset}: {len(loaded)} x {len(loaded.columns)}")
@@ -35,6 +41,9 @@ def load_data(dataset):
 
 
 def extract_eleven_mfcc_stat(wav):
+    """
+    Calculate means and stds for 11 mfccs with custom args.
+    """
     window_width = 0.220
     window_stride = 0.050
     sr = config.sample_rate
@@ -50,11 +59,17 @@ def extract_eleven_mfcc_stat(wav):
 
 
 def extract_brightness(fft):
+    """
+    Find how much relative energy corresponds to the frequencies above the threshold.
+    """
     frequency_threshold = 1800
     return [np.sum(fft[frequency_threshold:]) / np.sum(fft)]
 
 
 def extract_rolloff(fft):
+    """
+    Find the frequency index before which 85% of the energy was accumulated.
+    """
     threshold = np.sum(fft) * 0.85
     energy = 0.0
 
@@ -65,11 +80,17 @@ def extract_rolloff(fft):
 
 
 def extract_forty_mfcc_stat(wav):
+    """
+    Calculate (1, 25, 50, 75, 99) percentiles for 40 mfccs with default args.
+    """
     return [np.percentile(row, per) for row in librosa.feature.mfcc(wav, sr=config.sample_rate, n_mfcc=40)
             for per in (1, 25, 50, 75, 99)]
 
 
 def prepare_data(audiofiles, dataset):
+    """
+    Calculate features according to the config.features for all audiofiles and save it as .csv with name dataset.
+    """
     data = []
 
     for file in audiofiles:
@@ -94,6 +115,9 @@ def prepare_data(audiofiles, dataset):
 
 
 def handle_wrong_rows(data, dataset):
+    """
+    For train data just drop rows with NaN, while for test replace NaN rows with previous rows from test.
+    """
     if dataset == 'train':
         new_data = data.dropna()
         if len(new_data) == len(data):
@@ -117,6 +141,9 @@ def handle_wrong_rows(data, dataset):
 
 
 def relabel(predictions, re_dict):
+    """
+    Replace keys of re_dict in prediction with appropriate values.
+    """
     re_predictions = np.zeros_like(predictions)
 
     for key in re_dict:
@@ -126,6 +153,9 @@ def relabel(predictions, re_dict):
 
 
 def plot_clusters(train, predictions, targets):
+    """
+    Transform highly correlated with predictions features from train to 2D space and plot them for showing clusters.
+    """
     features = np.array([train[:, i] for i in range(train.shape[-1])
                          if abs(np.corrcoef(predictions, train[:, i])[0, 1]) > 0.5]).T
     num = 10000
