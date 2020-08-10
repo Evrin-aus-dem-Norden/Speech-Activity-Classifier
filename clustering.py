@@ -1,8 +1,8 @@
 import os
-import json
 import config
 import fnmatch
 import librosa
+import argparse
 import numpy as np
 import pandas as pd
 import soundfile as sf
@@ -230,5 +230,25 @@ def plot_clusters(train, predictions, targets):
 
 
 if __name__ == '__main__':
-    make_submission(train_pipeline())
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-t',
+        '--task_type',
+        help='kaggle/inference',
+        required=False
+    )
+    parser.add_argument(
+        '-p',
+        '--path',
+        help='path to wav files',
+        required=False
+    )
+
+    args = parser.parse_args()
+
+    if args and args.task_type == 'inference':
+        predict(args.path, train_pipeline())
+    else:
+        make_submission(train_pipeline())
 
