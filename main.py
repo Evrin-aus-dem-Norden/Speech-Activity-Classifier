@@ -87,9 +87,9 @@ def extract_forty_mfcc_stat(wav):
             for per in (1, 25, 50, 75, 99)]
 
 
-def prepare_data(audiofiles, dataset):
+def prepare_data(audiofiles):
     """
-    Calculate features according to the config.features for all audiofiles and save it as .csv with name dataset.
+    Return DataFrame with features according to the config.features for all audiofiles.
     """
     data = []
 
@@ -106,12 +106,21 @@ def prepare_data(audiofiles, dataset):
     columns = [feature[0] + str(i) for feature in config.features
                for i in range({'e': 22, 'b': 1, 'r': 1, 'f': 200}[feature[0]])]
     prepared = pd.DataFrame(data, columns=columns)
+
+    if config.verbose:
+        print(f"Prepared data: {len(prepared)} x {len(prepared.columns)}")
+
+    return prepared
+
+
+def save_data(prepared, dataset):
+    """
+    Save prepared as .csv with name dataset in config.prepared_path.
+    """
     prepared.to_csv(os.path.join(config.prepared_path, dataset) + '.csv', index=False)
 
     if config.verbose:
-        print(f"Prepared {dataset}: {len(prepared)} x {len(prepared.columns)}")
-
-    return prepared
+        print(f"Saved {dataset}.csv")
 
 
 def handle_wrong_rows(data, dataset):
@@ -176,14 +185,16 @@ if __name__ == '__main__':
     try:
         train_df = load_data('train')
     except FileNotFoundError:
-        train_df = prepare_data(list_audiofiles(config.train_path), 'train')
+        train_df = prepare_data(list_audiofiles(config.train_path))
+        save_data(train_df, 'train')
 
     submission = pd.read_csv(config.sample_submission)
 
     try:
         test_df = load_data('test')
     except FileNotFoundError:
-        test_df = prepare_data([os.path.join(config.test_path, 'val', path) for path in submission.wav_path], 'test')
+        test_df = prepare_data([os.path.join(config.test_path, 'val', path) for path in submission.wav_path])
+        save_data(test_df, 'test')
 
     train = np.array(handle_wrong_rows(train_df, 'train'))
     test = np.array(handle_wrong_rows(test_df, 'test'))
