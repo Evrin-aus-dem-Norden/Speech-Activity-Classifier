@@ -8,9 +8,10 @@ import soundfile as sf
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn import metrics
+from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.mixture import BayesianGaussianMixture
+from sklearn.preprocessing import StandardScaler
+from relabeled_bayesian_gaussian_mixture import RelabeledBayesianGaussianMixture
 
 
 def list_audiofiles(path):
@@ -149,18 +150,6 @@ def handle_wrong_rows(data, dataset):
         return data
 
 
-def relabel(predictions, re_dict):
-    """
-    Replace keys of re_dict in prediction with appropriate values.
-    """
-    re_predictions = np.zeros_like(predictions)
-
-    for key in re_dict:
-        re_predictions[predictions == key] = re_dict[key]
-
-    return re_predictions
-
-
 def plot_clusters(train, predictions, targets):
     """
     Transform highly correlated with predictions features from train to 2D space and plot them for showing clusters.
@@ -199,27 +188,21 @@ if __name__ == '__main__':
     train = np.array(handle_wrong_rows(train_df, 'train'))
     test = np.array(handle_wrong_rows(test_df, 'test'))
 
-    scaler = MinMaxScaler()
-    prep_train = scaler.fit_transform(train)
+    pipeline = Pipeline([('scaler', StandardScaler()),
+                         ('clusterization', RelabeledBayesianGaussianMixture(config=config,
+                                                                             n_components=config.n_classes,
+                                                                             tol=0.00001,
+                                                                             covariance_type='tied',
+                                                                             max_iter=10000,
+                                                                             random_state=18))])
 
-    bgm = BayesianGaussianMixture(n_components=config.n_classes, tol=0.00001, covariance_type='tied', max_iter=10000)
+    tr_predictions = pipeline.fit_predict(train)
+    te_predictions = pipeline.predict(test)
 
-    tr_predictions = bgm.fit_predict(prep_train)
-    te_predictions = bgm.predict(scaler.transform(test))
-
-    print(f"20 first predictions are\n {te_predictions[:20]}")
-    print("Enter values for relabeling")
-
-    re_dict = dict()
-    for c in range(config.n_classes):
-        re_dict[c] = int(input(f"{c}: "))
-
-    re_predictions = relabel(te_predictions, re_dict)
-    submission['target'] = re_predictions
+    submission['target'] = te_predictions
     submission.to_csv(config.submission, index=False)
 
-    re_predictions = relabel(tr_predictions, re_dict)
     targets = pd.read_csv('targets.csv').target
-    print('\nModel accuracy: %.3f' % (metrics.accuracy_score(targets, re_predictions)))
+    print('\nModel accuracy: %.3f' % (metrics.accuracy_score(targets, tr_predictions)))
 
-    plot_clusters(prep_train, re_predictions, targets)
+    plot_clusters(pipeline.steps.pop(0)[1].transform(train), tr_predictions, targets)
