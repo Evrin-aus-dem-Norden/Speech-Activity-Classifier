@@ -3,6 +3,7 @@ test_path = 'test'
 prepared_path = 'prepared'
 submission = 'submission.csv'
 sample_submission = 'sample_submission.csv'
+targets = 'targets.csv'
 
 n_classes = 3
 

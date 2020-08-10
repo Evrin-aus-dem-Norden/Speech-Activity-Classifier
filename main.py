@@ -150,6 +150,54 @@ def handle_wrong_rows(data, dataset):
         return data
 
 
+def train_pipeline():
+    """
+    Load or create dataset, then create and fit pipeline, show its results, and return it trained.
+    """
+    try:
+        train_df = load_data('train')
+    except FileNotFoundError:
+        train_df = prepare_data(list_audiofiles(config.train_path))
+        save_data(train_df, 'train')
+
+    train = np.array(handle_wrong_rows(train_df, 'train'))
+    pipeline = Pipeline([('scaler', StandardScaler()),
+                         ('clusterization', RelabeledBayesianGaussianMixture(config=config,
+                                                                             n_components=config.n_classes,
+                                                                             tol=0.00001,
+                                                                             covariance_type='tied',
+                                                                             max_iter=10000,
+                                                                             random_state=18))])
+
+    tr_predictions = pipeline.fit_predict(train)
+    targets = pd.read_csv(config.targets).target
+    print('\nModel accuracy: %.3f' % (metrics.accuracy_score(targets, tr_predictions)))
+
+    if config.verbose:
+        plot_clusters(pipeline.steps[0][1].transform(train), tr_predictions, targets)
+
+    return pipeline
+
+
+def make_submission(pipeline):
+    """
+    Compose a submission using giving pipeline.
+    """
+    submission = pd.read_csv(config.sample_submission)
+
+    try:
+        test_df = load_data('test')
+    except FileNotFoundError:
+        test_df = prepare_data([os.path.join(config.test_path, 'val', path) for path in submission.wav_path])
+        save_data(test_df, 'test')
+
+    test = np.array(handle_wrong_rows(test_df, 'test'))
+    te_predictions = pipeline.predict(test)
+
+    submission['target'] = te_predictions
+    submission.to_csv(config.submission, index=False)
+
+
 def plot_clusters(train, predictions, targets):
     """
     Transform highly correlated with predictions features from train to 2D space and plot them for showing clusters.
@@ -170,39 +218,5 @@ def plot_clusters(train, predictions, targets):
 
 
 if __name__ == '__main__':
+    make_submission(train_pipeline())
 
-    try:
-        train_df = load_data('train')
-    except FileNotFoundError:
-        train_df = prepare_data(list_audiofiles(config.train_path))
-        save_data(train_df, 'train')
-
-    submission = pd.read_csv(config.sample_submission)
-
-    try:
-        test_df = load_data('test')
-    except FileNotFoundError:
-        test_df = prepare_data([os.path.join(config.test_path, 'val', path) for path in submission.wav_path])
-        save_data(test_df, 'test')
-
-    train = np.array(handle_wrong_rows(train_df, 'train'))
-    test = np.array(handle_wrong_rows(test_df, 'test'))
-
-    pipeline = Pipeline([('scaler', StandardScaler()),
-                         ('clusterization', RelabeledBayesianGaussianMixture(config=config,
-                                                                             n_components=config.n_classes,
-                                                                             tol=0.00001,
-                                                                             covariance_type='tied',
-                                                                             max_iter=10000,
-                                                                             random_state=18))])
-
-    tr_predictions = pipeline.fit_predict(train)
-    te_predictions = pipeline.predict(test)
-
-    submission['target'] = te_predictions
-    submission.to_csv(config.submission, index=False)
-
-    targets = pd.read_csv('targets.csv').target
-    print('\nModel accuracy: %.3f' % (metrics.accuracy_score(targets, tr_predictions)))
-
-    plot_clusters(pipeline.steps.pop(0)[1].transform(train), tr_predictions, targets)
