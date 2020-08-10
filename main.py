@@ -1,4 +1,5 @@
 import os
+import json
 import config
 import fnmatch
 import librosa
@@ -177,6 +178,17 @@ def train_pipeline():
         plot_clusters(pipeline.steps[0][1].transform(train), tr_predictions, targets)
 
     return pipeline
+
+
+def predict(path, pipeline):
+    """
+    Calculate features for wav files in a directory tree and predict their clusters using giving pipeline.
+    """
+    data = np.array(prepare_data(list_audiofiles(path)))
+    predictions = [{0: 'speech', 1: 'music', 2: 'noise'}[label] for label in pipeline.predict(data)]
+    json_predictions = pd.DataFrame(predictions, columns=['class']).to_json()
+    print(json_predictions)
+    return json_predictions
 
 
 def make_submission(pipeline):
